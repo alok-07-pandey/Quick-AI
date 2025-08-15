@@ -1,3 +1,12 @@
+# Backend env
+server/.env
+
+# Frontend env
+client/.env
+
+# Node modules
 node_modules/
-.env
+
+# Build outputs
 dist/
+build/
