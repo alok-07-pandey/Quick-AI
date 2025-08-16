@@ -65,56 +65,51 @@ export const generateArticle = async (req, res) => {
 }
 
 
-
 // Generate Blog Title
-
 export const generateBlogTitle = async (req, res) => {
     try {
-        const { userId } = req.auth();
-        const { prompt } = req.body;
-        const plan = req.plan;
-        const free_usage = req.free_usage;
-
-        if (plan !== 'premium' && free_usage >= 10) {
-            return res.json({ success: false, message: "Limit reached.Upgrade to contimue." })
-
-        }
-        const response = await AI.chat.completions.create({
-            model: "gemini-2.0-flash",
-            messages: [
-                {
-                    role: "user", content: prompt,
-                }],
-            temperature: 0.7,
-            max_tokens: length,
+      const { userId } = req.auth();
+      const { prompt } = req.body;
+      const plan = req.plan;
+      const free_usage = req.free_usage;
+  
+      if (!prompt || prompt.trim().length === 0) {
+        return res.json({ success: false, message: "Prompt is required" });
+      }
+  
+      if (plan !== 'premium' && free_usage >= 10) {
+        return res.json({ success: false, message: "Limit reached. Upgrade to continue." });
+      }
+  
+      const response = await AI.chat.completions.create({
+        model: "gemini-2.0-flash",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+        max_tokens: 200,   // ✅ fixed
+      });
+  
+      const content = response.choices[0].message.content;
+  
+      await sql`
+        INSERT INTO creations (user_id, prompt, content, type) 
+        VALUES (${userId}, ${prompt}, ${content}, 'blog-title')
+      `;
+  
+      if (plan !== 'premium') {
+        await clerkClient.users.updateUserMetadata(userId, {
+          privateMetadata: {
+            free_usage: free_usage + 1
+          }
         });
-
-        const content = response.choices[0].message.content
-        await sql` INSERT INTO creations (user_id, prompt, content, type) 
-        VALUES (${userId} , ${prompt}, ${content},'blog-title')`;
-
-        if (plan !== 'premium') {
-            await clerkClient.users.updateUserMetadata(userIs, {
-                privateMetadata: {
-                    free_usage: free_usage + 1
-                }
-            })
-        }
-        response.json({ success: true, content })
-
-
-
+      }
+  
+      res.json({ success: true, content }); // ✅ fixed
     } catch (error) {
-        console.log(error.message);
-        res.json({ success: false, message: error.message })
-
-
+      console.log(error.message);
+      res.json({ success: false, message: error.message });
     }
-
-}
-
-
-
+  };
+  
 
 //Generate Image
 export const generateImage = async (req, res) => {
@@ -141,7 +136,7 @@ export const generateImage = async (req, res) => {
             {
                 headers: {
                     "x-api-key": process.env.CLIPDROP_API_KEY,
-                    ...formData.getHeaders(), // ✅ Ye add karo
+                    ...formData.getHeaders(), 
                 },
                 responseType: "arraybuffer",
             }
@@ -168,7 +163,7 @@ export const generateImage = async (req, res) => {
 export const removeImageBackground = async (req, res) => {
     try {
         const { userId } = req.auth();
-        const { image } = req.file;
+        const image  = req.file;
         const plan = req.plan;
 
         if (plan !== "premium") {
@@ -204,8 +199,8 @@ export const removeImageBackground = async (req, res) => {
 export const removeImageObject = async (req, res) => {
     try {
         const { userId } = req.auth();
-        const { object } = req.body();
-        const { image } = req.file;
+        const { object } = req.body;
+        const image  = req.file;
         const plan = req.plan;
 
         if (plan !== "premium") {

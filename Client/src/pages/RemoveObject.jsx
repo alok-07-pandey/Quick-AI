@@ -1,19 +1,53 @@
 import React, { useState } from 'react';
 import { Sparkles, Scissors } from 'lucide-react';
+import axios from 'axios';
+import { useAuth } from '@clerk/clerk-react';
+import toast from 'react-hot-toast';
+
+axios.defaults.baseURL = import.meta.env.VITE_BASE_URL;
 
 const RemoveObject = () => {
   const [input, setInput] = useState('');
   const [object, setObject] = useState('');
   const [processedImage, setProcessedImage] = useState(null);
 
+  const [loading, setLoading] = useState(false)
+  const [content, setContent] = useState('')
+
+  const { getToken } = useAuth()
+
   const onSubmitHandler = async (e) => {
     e.preventDefault();
-    console.log("Uploaded file:", input);
-    console.log("Object to remove:", object);
+    try {
+        setLoading(true)
+        if(object.split(' ').length > 1){
+          return toast('Please enter only one object name')
+        }
+        const formData = new FormData()
+        formData.append('image', input)
+        formData.append('object', object)
 
-    // Example: Call your backend or AI API here to process the image
-    // After processing, update the processedImage state with the returned image URL
-    // setProcessedImage('processed-image-url');
+        const { data } = await axios.post('/api/ai/remove-image-object',
+          formData ,
+          {
+          headers: 
+          { Authorization: `Bearer ${await getToken()}`,
+        'Content-Type': 'multipart/form-data'
+       }
+        })
+  
+        if (data.success) {
+          setContent(data.content)
+        } else {
+          toast.error(data.message)
+        }
+      
+    } catch (error) {
+      toast.error(error.message)
+      
+    }finally{
+      setLoading(false)
+    }
   };
 
   return (
@@ -46,11 +80,16 @@ const RemoveObject = () => {
 
         <button
           type='submit'
+          disabled={loading}
           className='w-full flex justify-center items-center gap-2 
                     bg-gradient-to-r from-[#0b358e] to-[#0d9dc4] text-white px-4 py-2 mt-6
                     text-sm rounded-lg cursor-pointer'
         >
-          <Scissors className='w-5' />
+          {
+            loading ? <span className='w-4 h-4 my-1 rounded-full border-2 border-t-transparent animate-spin'></span> 
+            : <Scissors className='w-5' />
+          }
+          
           Remove Object
         </button>
       </form>
@@ -61,16 +100,25 @@ const RemoveObject = () => {
           <Scissors className='w-5 h-5 text-[#c176bd]' />
           <h1 className='text-xl font-semibold'>Processed Image</h1>
         </div>
-        <div className='flex-1 flex justify-center items-center'>
-          {processedImage ? (
-            <img src={processedImage} alt="Processed" className="max-w-full rounded-md" />
-          ) : (
-            <div className='text-sm flex flex-col items-center gap-5 text-gray-400'>
-              <Scissors className='w-9 h-9' />
-              <p>Upload an image and click "Remove Object" to get started</p>
+
+          {
+            !content ? (
+              <div className='flex-1 flex justify-center items-center'>
+              {processedImage ? (
+                <img src={processedImage} alt="Processed" className="max-w-full rounded-md" />
+              ) : (
+                <div className='text-sm flex flex-col items-center gap-5 text-gray-400'>
+                  <Scissors className='w-9 h-9' />
+                  <p>Upload an image and click "Remove Object" to get started</p>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+            ):(
+              <img src={content} alt="image" className='mt-3 w-full h-full'/>
+            )
+          }
+
+      
       </div>
     </div>
   );
